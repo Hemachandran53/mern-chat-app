@@ -1,48 +1,45 @@
 import { Server } from "socket.io";
 import http from "http";
 import express from "express";
-
-
-const app = express();
 import cors from "cors";
 
-// Add CORS middleware for Express
-app.use(cors({
-  origin: ["http://localhost:3000"],
-  credentials: true,
-}));
+const app = express();
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  credentials: true
+};
+app.use(cors(corsOptions));
 
 const server = http.createServer(app);
 const io = new Server(server, {
-	cors: {
-		origin: ["http://localhost:3000"],
-		methods: ["GET", "POST"],
-		credentials: true,
-	}
+  cors: corsOptions
 });
 
-
 export const getReceiverSocketId = (receiverId) => {
-	return userSocketMap[receiverId];
+  return userSocketMap[receiverId];
 };
 
 const userSocketMap = {}; // {userId: socketId}
 
 io.on("connection", (socket) => {
-	console.log("a user connected", socket.id);
+  console.log("User connected:", socket.id);
 
-	const userId = socket.handshake.query.userId;
-	if (userId != "undefined") userSocketMap[userId] = socket.id;
+  const userId = socket.handshake.query.userId;
+  if (userId && userId !== "undefined") {
+    userSocketMap[userId] = socket.id;
+  }
 
-	// io.emit() is used to send events to all the connected clients
-	io.emit("getOnlineUsers", Object.keys(userSocketMap));
+  io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
-	// socket.on() is used to listen to the events. can be used both on client and server side
-	socket.on("disconnect", () => {
-		console.log("user disconnected", socket.id);
-		delete userSocketMap[userId];
-		io.emit("getOnlineUsers", Object.keys(userSocketMap));
-	});
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+    if (userId && userId !== "undefined") {
+      delete userSocketMap[userId];
+    }
+    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+  });
 });
 
 export { app, io, server };
